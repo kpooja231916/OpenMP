@@ -1,0 +1,92 @@
+#include<stdio.h>
+#include<omp.h>
+omp_lock_t writelock;
+omp_lock_t readlock;
+omp_lock_t mutex;
+int readcount=0;
+int tid=-1;
+void reader(int rc)
+{
+	printf("\n Thread id=%d rc=%d ", omp_get_thread_num(),rc);
+	omp_set_lock(&readlock);
+		readcount++;
+			if(readcount==1)
+				omp_set_lock(&writelock);
+	omp_unset_lock(&readlock);
+	printf("R[%d] reader is entering critical section \n",rc);
+	printf("R[%d] reader is leaving critical section \n",rc);
+	
+	omp_set_lock(&readlock);
+		readcount--;
+			if(readcount==0)
+				omp_unset_lock(&writelock);
+				omp_unset_lock(&readlock);
+}
+void writer(int wc)
+{
+	printf("\n thread id= %d wc= %d",omp_get_thread_num(),wc);
+	omp_set_lock(&writelock);
+	printf("W[%d] write is entering critical section \n",wc);
+	omp_unset_lock(&writelock);	
+	printf("W[%d] write is leaving critical section \n",wc);
+	
+}
+int main()
+{
+	omp_init_lock(&writelock);
+	omp_init_lock(&readlock);
+	omp_init_lock(&mutex);
+#pragma omp parallel shared(writelock,mutex)private(tid)	
+{
+		
+		omp_set_num_threads(6);
+		#pragma omp single
+		{reader(1);}
+		#pragma omp single
+		{reader(2);}
+		#pragma omp single
+		{reader(3);}
+		#pragma omp single
+		{writer(1);}
+		#pragma omp single
+		{reader(4);}
+		#pragma omp single
+		{writer(2);}
+	}
+
+
+  
+omp_destroy_lock(&writelock);
+omp_destroy_lock(&readlock);
+omp_destroy_lock(&mutex);
+}
+
+
+/*  OUTPUT
+
+[student@localhost ~]$ su
+Password: 
+[root@localhost student]# cd Desktop
+[root@localhost Desktop]# gcc -fopenmp rwpooh.c
+[root@localhost Desktop]# ./a.out
+
+ Thread id=0 rc=1 R[1] reader is entering critical section 
+R[1] reader is leaving critical section 
+
+ Thread id=1 rc=2 R[2] reader is entering critical section 
+R[2] reader is leaving critical section 
+
+ Thread id=1 rc=3 R[3] reader is entering critical section 
+R[3] reader is leaving critical section 
+
+ thread id= 1 wc= 1W[1] write is entering critical section 
+W[1] write is leaving critical section 
+
+ Thread id=1 rc=4 R[4] reader is entering critical section 
+R[4] reader is leaving critical section 
+
+ thread id= 1 wc= 2W[2] write is entering critical section 
+W[2] write is leaving critical section 
+[root@localhost Desktop]# 
+
+*/
